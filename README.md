@@ -1,5 +1,7 @@
 # auto_mcp_ai
 
+![Overview — explore a site, capture session, publish MCP capabilities for Cursor](auto_mcp_intro.png)
+
 Local toolkit that explores a website, captures an authenticated browser session, proposes MCP tools from observed APIs, and runs those tools as MCP servers for Cursor.
 
 **Site packs** live in sibling repos (not in this monorepo). Public samples: [`auto_mcp_ai_sample_packs`](docs/EXAMPLE_JIRA_PACK.md) (`packages/site-adapter-jira`, …). See [docs/EXAMPLE_JIRA_PACK.md](docs/EXAMPLE_JIRA_PACK.md) and `packages/site-adapters/src/ADD_SITE.md`.
