@@ -1,0 +1,38 @@
+{
+  "name": "@auto-mcp/mcp-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "auto-mcp-runtime": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsc -p tsconfig.json --watch",
+    "start": "node dist/cli.js",
+    "test": "pnpm run build && node --test dist/replay.test.js"
+  },
+  "dependencies": {
+    "@auto-mcp/browser-auth": "workspace:*",
+    "@auto-mcp/mcp-generator": "workspace:*",
+    "@auto-mcp/registry": "workspace:*",
+    "@auto-mcp/shared": "workspace:*",
+    "@auto-mcp/site-adapters": "workspace:*",
+    "@auto-mcp/vault": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}

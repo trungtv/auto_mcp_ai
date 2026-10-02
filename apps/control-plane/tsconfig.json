@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/compiler" },
+    { "path": "../../packages/registry" },
+    { "path": "../../packages/vault" },
+    { "path": "../../packages/browser-auth" },
+    { "path": "../../packages/explorer" },
+    { "path": "../../packages/mcp-generator" },
+    { "path": "../../packages/mcp-runtime" },
+    { "path": "../../packages/cursor-discover" },
+    { "path": "../../packages/site-adapters" },
+    { "path": "../../packages/mcp-control" }
+  ]
+}

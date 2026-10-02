@@ -1,0 +1,22 @@
+{
+  "name": "auto-mcp-ai",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "postinstall": "node scripts/ensure-adapters-extra.mjs",
+    "build": "pnpm -r run build",
+    "dev": "node scripts/dev.mjs",
+    "dev:api": "pnpm --filter @auto-mcp/control-plane run dev",
+    "dev:ui": "pnpm --filter @auto-mcp/dashboard run dev",
+    "mcp": "pnpm --filter @auto-mcp/mcp-runtime run start",
+    "mcp:control": "pnpm --filter @auto-mcp/mcp-control run start",
+    "mcp:control:register": "pnpm --filter @auto-mcp/mcp-control run build && pnpm --filter @auto-mcp/mcp-control run register",
+    "typecheck": "pnpm -r run typecheck",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:mcp-control": "pnpm --filter @auto-mcp/mcp-control run build && node scripts/smoke-mcp-control.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@auto-mcp/cursor-discover",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "pnpm run build && node --test dist/coverage.test.js dist/pack-author.test.js"
+  },
+  "dependencies": {
+    "@auto-mcp/browser-auth": "workspace:*",
+    "@auto-mcp/explorer": "workspace:*",
+    "@auto-mcp/shared": "workspace:*",
+    "@cursor/sdk": "^1.0.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}
