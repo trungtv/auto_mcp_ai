@@ -60,13 +60,15 @@ export const extraAdapters: SiteAdapter[] = [jiraAdapter];
 ## Imports from core (pack code)
 
 ```ts
+import { runPipeline } from "@auto-mcp/site-adapters/bound.js";
 import {
   findPrimitive,
-  runPipeline,
   type SiteAdapter,
   type FormatContext,
-} from "@auto-mcp/site-adapters";
+} from "@auto-mcp/site-adapters/types.js";
 ```
+
+Use **subpath** imports (not the package root) so wired packs do not pull in `registry` → `adapters.extra` during init.
 
 Pack **`dependencies`**: `@auto-mcp/shared`, `@auto-mcp/site-adapters` (`workspace:*` in dev tree, or semver pin from npm).
 
