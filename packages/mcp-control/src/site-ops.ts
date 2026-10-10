@@ -41,6 +41,7 @@ import {
   buildApprovePreview,
   capabilityPublishSummary,
   nextAfterApprove,
+  summarizePublishGap,
   nextAfterRegister,
 } from "./workflow.js";
 
@@ -360,6 +361,7 @@ export function compileEndpointsOp(
   );
   const updated = ctx.registry.update(site.id, { tools, endpointIr: nextIr });
   const pub = capabilityPublishSummary(updated);
+  const publishGap = summarizePublishGap(updated);
   return {
     preview: false,
     approved: plan.tools.map((t) => t.name),
@@ -367,6 +369,9 @@ export function compileEndpointsOp(
     toolCount: updated.tools.filter((t) => t.approved).length,
     seedReadiness: pub.seedReadiness,
     capabilities: pub.capabilityNames,
+    mcpToolNames: publishGap.mcpToolNames,
+    unmappedPrimitives: publishGap.unmappedPrimitives,
+    publishHint: publishGap.publishHint,
     next: nextAfterApprove(updated),
   };
 }

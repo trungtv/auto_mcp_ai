@@ -4,6 +4,7 @@ import {
   listCapabilitiesForSite,
   listSeedCapabilities,
   resolveAdapter,
+  type Capability,
 } from "@auto-mcp/site-adapters";
 import { planCompile, rebuildIr } from "@auto-mcp/compiler";
 import { toolsFromCandidates, upgradeTools } from "@auto-mcp/mcp-generator";
@@ -16,6 +17,53 @@ export type SeedReadiness = {
   /** True when at least one capability is publishable (seeds unlocked or stored). */
   hasPublishableCapabilities: boolean;
 };
+
+export type PublishGap = {
+  primitiveNames: string[];
+  mcpToolNames: string[];
+  unmappedPrimitives: string[];
+  publishHint: string;
+};
+
+function boundPrimitiveNames(caps: Capability[]): Set<string> {
+  const out = new Set<string>();
+  for (const cap of caps) {
+    const bind = cap.bind;
+    if (!bind) continue;
+    if (bind.kind === "primitive") {
+      out.add(bind.primitive);
+    } else if (bind.kind === "pipeline") {
+      for (const step of bind.steps) out.add(step.primitive);
+    }
+  }
+  return out;
+}
+
+/** Approved primitives with no effective MCP capability bind (specialized adapters). */
+export function summarizePublishGap(site: McpSite): PublishGap {
+  const primitives = upgradeTools(site.tools.filter((t) => t.approved !== false));
+  const primitiveNames = primitives.map((t) => t.name);
+  const effective = listCapabilitiesForSite({ site, primitives });
+  const mcpToolNames = effective.map((c) => c.name);
+  const adapter = resolveAdapter(site);
+  let bound = boundPrimitiveNames(effective);
+  if (adapter.id === "generic-replay") {
+    bound = new Set(primitiveNames);
+  }
+  const unmappedPrimitives = primitiveNames.filter((n) => !bound.has(n));
+  const publishHint =
+    unmappedPrimitives.length > 0
+      ? `${unmappedPrimitives.length} primitive(s) chưa có MCP tool: ${unmappedPrimitives.join(", ")}. Cần pack seed hoặc upsert_capability — hosted MCP chỉ list capabilities, không dump primitive thô.`
+      : mcpToolNames.length > 0
+        ? `Hosted MCP tools (${mcpToolNames.length}): ${mcpToolNames.join(", ")}.`
+        : "Chưa có MCP capability — compile primitive khớp pack hoặc upsert_capability.";
+  return {
+    primitiveNames,
+    mcpToolNames,
+    unmappedPrimitives,
+    publishHint,
+  };
+}
 
 export function summarizeSeedReadiness(site: McpSite): SeedReadiness {
   const primitives = upgradeTools(site.tools.filter((t) => t.approved));
@@ -88,7 +136,11 @@ export function nextAfterApprove(site: McpSite): string {
       : "(none — upsert_capability or explore more APIs)";
     return `Approved primitives saved, but no business capabilities yet. Adapter \`${live.seedReadiness.adapterId}\` seeds: ${seeds}. Approve primitives that unlock seeds, then list_capabilities before register_site_mcp.`;
   }
-  const caps = live.capabilityNames.slice(0, 8).join(", ");
+  const gap = summarizePublishGap(site);
+  const caps = live.capabilityNames.slice(0, 12).join(", ");
+  if (gap.unmappedPrimitives.length > 0) {
+    return `Primitives saved. MCP tools (${live.capabilityNames.length}): ${caps}. Unmapped primitives: ${gap.unmappedPrimitives.join(", ")}. Call list_capabilities — do not claim tools that are not in mcpToolNames.`;
+  }
   return `Call list_capabilities (expect: ${caps}). Then register_site_mcp and reload Cursor MCP server key for this site. Site MCP exposes capabilities, not raw primitives.`;
 }
 
@@ -145,10 +197,12 @@ export const CONTROL_MCP_INSTRUCTIONS = `auto_mcp_ai meta MCP — publish websit
 Workflow:
 1) create_site (or set_active_site)
 2) login_start → user logs in browser → login_confirm
-3) Explore: browser_goto / browser_click / network_mark + network_snapshot (or quick_scan)
+3) Explore SPA: network_mark → browser_goto hoặc browser_click menu → browser_wait → network_snapshot. quick_scan (reuseSession:true mặc định). set_explore_path cho quick_scan. Không script Playwright parallel cùng profile.
 4) list_endpoint_ir → đề xuất tên (rename_endpoint_ir) → compile_endpoints / approve_candidates confirm:true
 5) test_endpoint_ir confirm:true → list_capability_graph → upsert_capability (optional endpointIrId / endpointIrIds)
 6) try_capability to smoke-test → register_site_mcp → reload the per-site MCP key in Cursor
 
 Demo pack: @auto-mcp/site-adapter-jira (wired in adapters.extra.ts). More packs: auto_mcp_ai_sample_packs or your own repo (same layout).
-Primitive = captured HTTP call. Capability = agent-facing tool (domain format / pipeline).`;
+Primitive = captured HTTP call. Capability = agent-facing tool (domain format / pipeline).
+
+Hotellink: click menu (Reports, Setup, MISC) thay vì hash đoán. reuseSession:false có thể đá login/CAPTCHA.`;

@@ -19,11 +19,14 @@ export {
   validateCapabilityDef,
   type SiteOpsContext,
 } from "./site-ops.js";
+export { quickScanOp, type QuickScanResult } from "./quick-scan.js";
 export {
   buildApprovePreview,
   capabilityPublishSummary,
   nextAfterApprove,
   nextAfterRegister,
   summarizeSeedReadiness,
+  summarizePublishGap,
+  type PublishGap,
   type SeedReadiness,
 } from "./workflow.js";
