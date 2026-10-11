@@ -18,7 +18,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "pnpm run build && node --test dist/workflow.test.js dist/compile.test.js",
+    "test": "pnpm run build && node --test dist/workflow.test.js dist/compile.test.js dist/quick-scan.test.js",
     "start": "node dist/cli.js",
     "register": "node dist/register-cli.js"
   },

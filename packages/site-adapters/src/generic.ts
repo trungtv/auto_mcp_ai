@@ -1,8 +1,10 @@
-import type { ToolDef } from "@auto-mcp/shared";
+import { GENERIC_CAPABILITY_FORMATS, type ToolDef } from "@auto-mcp/shared";
+import { formatWithEngine } from "./format-engine/index.js";
 import type {
   AdapterContext,
   Capability,
   CapabilityResult,
+  FormatContext,
   SiteAdapter,
 } from "./types.js";
 
@@ -27,7 +29,10 @@ function primitiveToCapability(tool: ToolDef): Capability {
       const ok =
         result.status >= 200 &&
         result.status < 300 &&
-        !(typeof result.body === "string" && result.body.trimStart().startsWith("//EX"));
+        !(
+          typeof result.body === "string" &&
+          result.body.trimStart().startsWith("//EX")
+        );
       const preview =
         bodyText.length > 48_000 ? bodyText.slice(0, 48_000) : bodyText;
       const structuredContent = {
@@ -56,6 +61,10 @@ function primitiveToCapability(tool: ToolDef): Capability {
 export const genericReplayAdapter: SiteAdapter = {
   id: "generic-replay",
   match: () => true,
+  knownFormats: GENERIC_CAPABILITY_FORMATS,
+  supportsFormat: (format) =>
+    (GENERIC_CAPABILITY_FORMATS as readonly string[]).includes(format),
+  formatCapability: (ctx: FormatContext) => formatWithEngine(ctx),
   capabilities: ({ primitives }) =>
     primitives.filter((t) => t.approved !== false).map(primitiveToCapability),
 };

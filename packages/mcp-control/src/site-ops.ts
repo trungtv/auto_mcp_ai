@@ -21,10 +21,12 @@ import {
 } from "@auto-mcp/compiler";
 import { mergeTools, upgradeTools } from "@auto-mcp/mcp-generator";
 import {
+  adapterPackIdError,
   getCapability,
   listCapabilitiesForSite,
   packSupportsFormat,
   resolveAdapter,
+  validateFormatOptions,
   type SiteAdapter,
 } from "@auto-mcp/site-adapters";
 import {
@@ -134,6 +136,8 @@ export function validateCapabilityDef(
   adapter: SiteAdapter,
   def: CapabilityDef,
 ): void {
+  const pinErr = adapterPackIdError(site);
+  if (pinErr) throw new Error(pinErr);
   if (def.enabled === false) return;
 
   if (def.bind.kind === "pipeline") {
@@ -149,6 +153,9 @@ export function validateCapabilityDef(
         step.defaults ?? {},
       );
       assertFormatOwned(adapter, step.format);
+      if (step.format && step.formatOptions) {
+        validateFormatOptions(step.format, step.formatOptions);
+      }
     }
     assertFormatOwned(adapter, def.bind.format);
     return;
@@ -196,6 +203,9 @@ export function validateCapabilityDef(
     def.bind.defaults ?? {},
   );
   assertFormatOwned(adapter, def.bind.format);
+  if (def.bind.format && def.bind.formatOptions) {
+    validateFormatOptions(def.bind.format, def.bind.formatOptions);
+  }
 }
 
 export function assertEndpointIrBind(

@@ -12,8 +12,15 @@ export function SitesPage() {
   function onCreate(e: FormEvent) {
     e.preventDefault();
     runSafe("create", async () => {
-      const { site } = await api.createSite({ name: name.trim(), baseUrl: baseUrl.trim() });
-      setMessage(`Đã thêm ${site.name}`);
+      const { site, created } = await api.createSite({
+        name: name.trim(),
+        baseUrl: baseUrl.trim(),
+      });
+      setMessage(
+        created === false
+          ? `Đã có site cho domain này — mở ${site.name}`
+          : `Đã thêm ${site.name}`,
+      );
       await refresh();
       navigate(`/sites/${site.id}/overview`);
     });
@@ -42,7 +49,11 @@ export function SitesPage() {
             ))}
           </ul>
           {sites.length === 0 ? (
-            <p className="empty">Chưa có server. Thêm website bên phải.</p>
+            <p className="empty">
+              Chưa có server (website trong registry). Site packs đã wire chỉ là adapter
+              code — thêm URL bên phải hoặc dùng meta MCP <code>create_site</code>.
+              Dữ liệu explore lưu trong <code>.data/</code>, không trong repo packs.
+            </p>
           ) : null}
         </section>
 

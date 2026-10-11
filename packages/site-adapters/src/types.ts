@@ -64,6 +64,7 @@ export type FormatContext = {
   includeRaw?: boolean;
   args: Record<string, unknown>;
   site: McpSite;
+  formatOptions?: Record<string, unknown>;
 };
 
 /**

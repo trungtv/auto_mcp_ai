@@ -12,11 +12,16 @@ Local toolkit that explores a website, captures an authenticated browser session
 - pnpm 9+
 - Chromium (installed via Playwright)
 
+## Dev tree (private packs)
+
+Core-only clone: `pnpm install` + `pnpm build` trong repo này.
+
+Với **Entrade / sample packs** (sibling repos), dùng layout trong [docs/DEV_TREE.md](docs/DEV_TREE.md) và template [docs/examples/dev-tree/](docs/examples/dev-tree/).
+
 ## Setup
 
 ```bash
-pnpm install
-pnpm exec playwright install chromium
+pnpm install   # postinstall: adapters.extra stub + Playwright chromium (nếu thiếu)
 cp .env.example .env
 # Edit AUTO_MCP_MASTER_KEY and AUTO_MCP_CONTROL_TOKEN (and optionally CURSOR_API_KEY)
 ```
@@ -27,7 +32,7 @@ cp .env.example .env
 pnpm dev
 ```
 
-- Dashboard: http://127.0.0.1:5173
+- Dashboard: http://127.0.0.1:5173 (hoặc `AUTO_MCP_DASHBOARD_PORT` trong `.env`; `strictPort` — không tự đổi cổng im lặng)
 - Control plane API: http://127.0.0.1:3847
 
 ## Usage — Meta MCP in Cursor (recommended)

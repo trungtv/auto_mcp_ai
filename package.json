@@ -3,9 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "postinstall": "node scripts/ensure-adapters-extra.mjs",
-    "build": "pnpm -r run build",
+    "postinstall": "node scripts/ensure-adapters-extra.mjs && node scripts/ensure-playwright.mjs",
+    "build:wired": "node scripts/build-wired.mjs",
+    "build": "node scripts/build-wired.mjs",
     "dev": "node scripts/dev.mjs",
     "dev:api": "pnpm --filter @auto-mcp/control-plane run dev",
     "dev:ui": "pnpm --filter @auto-mcp/dashboard run dev",

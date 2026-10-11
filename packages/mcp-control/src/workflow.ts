@@ -1,9 +1,11 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import {
+  genericReplayAdapter,
   listCapabilitiesForSite,
   listSeedCapabilities,
   resolveAdapter,
+  resolveAdapterOrError,
   type Capability,
 } from "@auto-mcp/site-adapters";
 import { planCompile, rebuildIr } from "@auto-mcp/compiler";
@@ -45,18 +47,27 @@ export function summarizePublishGap(site: McpSite): PublishGap {
   const primitiveNames = primitives.map((t) => t.name);
   const effective = listCapabilitiesForSite({ site, primitives });
   const mcpToolNames = effective.map((c) => c.name);
-  const adapter = resolveAdapter(site);
+  const resolved = resolveAdapterOrError(site);
+  const adapter = resolved.adapter ?? genericReplayAdapter;
   let bound = boundPrimitiveNames(effective);
-  if (adapter.id === "generic-replay") {
+  const genericAuto =
+    adapter.id === "generic-replay" && site.capabilityPublishMode !== "curated";
+  if (genericAuto) {
     bound = new Set(primitiveNames);
   }
   const unmappedPrimitives = primitiveNames.filter((n) => !bound.has(n));
+  const modeNote =
+    adapter.id === "generic-replay"
+      ? site.capabilityPublishMode === "curated"
+        ? " (curated site pack)"
+        : " (auto — gọi bootstrap_site_pack để curated)"
+      : "";
   const publishHint =
     unmappedPrimitives.length > 0
-      ? `${unmappedPrimitives.length} primitive(s) chưa có MCP tool: ${unmappedPrimitives.join(", ")}. Cần pack seed hoặc upsert_capability — hosted MCP chỉ list capabilities, không dump primitive thô.`
+      ? `${unmappedPrimitives.length} primitive(s) chưa có MCP tool: ${unmappedPrimitives.join(", ")}. Cần pack seed, bootstrap_site_pack, hoặc upsert_capability${modeNote}.`
       : mcpToolNames.length > 0
-        ? `Hosted MCP tools (${mcpToolNames.length}): ${mcpToolNames.join(", ")}.`
-        : "Chưa có MCP capability — compile primitive khớp pack hoặc upsert_capability.";
+        ? `Hosted MCP tools (${mcpToolNames.length}): ${mcpToolNames.join(", ")}${modeNote}.`
+        : `Chưa có MCP capability — compile primitive khớp pack, bootstrap_site_pack, hoặc upsert_capability${modeNote}.`;
   return {
     primitiveNames,
     mcpToolNames,
@@ -69,8 +80,10 @@ export function summarizeSeedReadiness(site: McpSite): SeedReadiness {
   const primitives = upgradeTools(site.tools.filter((t) => t.approved));
   const seeds = listSeedCapabilities({ site, primitives });
   const effective = listCapabilitiesForSite({ site, primitives });
+  const resolved = resolveAdapterOrError(site);
   return {
-    adapterId: resolveAdapter(site).id,
+    adapterId:
+      resolved.adapter?.id ?? site.adapterPackId ?? genericReplayAdapter.id,
     seedCapabilityNames: seeds.map((c) => c.name),
     effectiveCapabilityNames: effective.map((c) => c.name),
     hasPublishableCapabilities: effective.length > 0,

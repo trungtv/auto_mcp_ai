@@ -21,6 +21,8 @@ export interface RuntimeOptions {
   siteId: string;
   dataDir: string;
   masterKey: string;
+  /** Shown when site auth is missing or expired (hosted cloud overrides). */
+  reauthHint?: string;
 }
 
 function toolsNeedUpgrade(tools: ToolDef[]): boolean {
@@ -47,9 +49,13 @@ function ensureUpgradedTools(registry: Registry, siteId: string): ToolDef[] {
   return tools.filter((t) => t.approved);
 }
 
-export async function startMcpServer(options: RuntimeOptions): Promise<void> {
+const DEFAULT_REAUTH_HINT =
+  "No auth snapshot. On meta MCP auto_mcp_ai call login_start → log in → login_confirm (same DATA_DIR). Dashboard Đăng nhập also works.";
+
+export function createSiteMcpServer(options: RuntimeOptions): Server {
   const registry = new Registry(options.dataDir);
   const vault = new Vault(options.dataDir, options.masterKey);
+  const reauthHint = options.reauthHint ?? DEFAULT_REAUTH_HINT;
 
   const site = registry.get(options.siteId);
   if (!site) {
@@ -99,12 +105,7 @@ export async function startMcpServer(options: RuntimeOptions): Promise<void> {
     if (!auth) {
       registry.update(options.siteId, { status: "needs_auth" });
       return {
-        content: [
-          {
-            type: "text",
-            text: "No auth snapshot. On meta MCP auto_mcp_ai call login_start → log in → login_confirm (same DATA_DIR). Dashboard Đăng nhập also works.",
-          },
-        ],
+        content: [{ type: "text", text: reauthHint }],
         isError: true,
       };
     }
@@ -148,7 +149,7 @@ export async function startMcpServer(options: RuntimeOptions): Promise<void> {
           content: [
             {
               type: "text",
-              text: `${err.message}. Re-authenticate via meta MCP auto_mcp_ai: login_start → login_confirm (or dashboard Đăng nhập lại).`,
+              text: `${err.message}. ${reauthHint}`,
             },
           ],
           isError: true,
@@ -162,6 +163,11 @@ export async function startMcpServer(options: RuntimeOptions): Promise<void> {
     }
   });
 
+  return server;
+}
+
+export async function startMcpServer(options: RuntimeOptions): Promise<void> {
+  const server = createSiteMcpServer(options);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

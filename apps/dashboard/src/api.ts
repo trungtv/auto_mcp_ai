@@ -120,7 +120,7 @@ export const api = {
       }>;
     }>(`/api/sites/${id}/capabilities`),
   createSite: (body: { name?: string; baseUrl: string; explorePath?: string }) =>
-    request<{ site: McpSite }>("/api/sites", {
+    request<{ site: McpSite; created?: boolean }>("/api/sites", {
       method: "POST",
       body: JSON.stringify(body),
     }),

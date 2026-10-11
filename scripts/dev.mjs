@@ -5,7 +5,15 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const nodeMajor = Number(process.versions.node.split(".")[0] ?? 0);
+if (nodeMajor < 22) {
+  console.error(
+    `Node.js 22+ required (registry uses node:sqlite). Current: ${process.version}`,
+  );
+  process.exit(1);
+}
 const apiUrl = "http://127.0.0.1:3847/api/health";
+const dashboardPort = process.env.AUTO_MCP_DASHBOARD_PORT || "5173";
 
 function run(filter) {
   return spawn("pnpm", ["--filter", filter, "run", "dev"], {
@@ -51,6 +59,12 @@ if (!ready) {
 }
 
 console.log("Control plane ready — starting dashboard");
+console.log(
+  `Dashboard URL (after Vite ready): http://127.0.0.1:${dashboardPort}/`,
+);
+console.log(
+  "If port is busy, set AUTO_MCP_DASHBOARD_PORT in .env (Vite strictPort).",
+);
 const ui = run("@auto-mcp/dashboard");
 
 function shutdown(signal) {

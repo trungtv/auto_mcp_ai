@@ -26,7 +26,11 @@ import {
   snapshotAuthFields,
   type AuthHeadersByOrigin,
 } from "./auth-origin.js";
-import { acquireProfileLock, releaseProfileLock } from "./profile-lock.js";
+import {
+  acquireProfileLock,
+  assertProfileAvailable,
+  releaseProfileLock,
+} from "./profile-lock.js";
 
 function cookieToSnapshot(c: Cookie): AuthSnapshot["cookies"][number] {
   return {
@@ -85,6 +89,7 @@ export class BrowserSession {
   async open(auth?: AuthSnapshot | null): Promise<void> {
     if (this.context) return;
     mkdirSync(this.opts.profileDir, { recursive: true });
+    assertProfileAvailable(this.opts.profileDir);
     acquireProfileLock({
       profileDir: this.opts.profileDir,
       siteId: this.opts.siteId,

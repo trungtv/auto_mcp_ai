@@ -24,12 +24,21 @@ export {
   runPipeline,
 } from "./bound.js";
 export { resolveArgTemplates } from "./pipeline.js";
-export { genericReplayAdapter } from "./generic.js";
+export { genericReplayAdapter, listGenericCapabilities } from "./generic.js";
 export {
+  adapterPackIdError,
+  getAdapterById,
   getCapability,
   listAdapters,
   listCapabilitiesForSite,
   listKnownFormats,
   listSeedCapabilities,
   resolveAdapter,
+  resolveAdapterOrError,
+  type ResolveAdapterResult,
 } from "./registry.js";
+export {
+  formatWithEngine,
+  listFormatHandlerIds,
+  validateFormatOptions,
+} from "./format-engine/index.js";

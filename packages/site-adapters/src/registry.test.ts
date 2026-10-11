@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { CapabilityDef, McpSite, ToolDef } from "@auto-mcp/shared";
-import { listCapabilitiesForSite } from "./registry.js";
+import { getAdapterById, listCapabilitiesForSite } from "./registry.js";
 
-function site(baseUrl: string, capabilities: CapabilityDef[] = []): McpSite {
+const jiraWired = Boolean(getAdapterById("jira"));
+const jiraIt = jiraWired ? it : it.skip;
+
+function site(
+  baseUrl: string,
+  capabilities: CapabilityDef[] = [],
+  opts?: { adapterPackId?: string | null; capabilityPublishMode?: "auto" | "curated" },
+): McpSite {
   return {
     id: "s1",
     name: "t",
@@ -27,6 +34,8 @@ function site(baseUrl: string, capabilities: CapabilityDef[] = []): McpSite {
     replayMode: "http",
     observedActions: [],
     endpointIr: [],
+    adapterPackId: opts?.adapterPackId ?? null,
+    capabilityPublishMode: opts?.capabilityPublishMode ?? "auto",
   };
 }
 
@@ -47,9 +56,11 @@ function primitive(name: string): ToolDef {
 }
 
 describe("listCapabilitiesForSite", () => {
-  it("does not dump Jira primitives when no stored defs and seeds locked", () => {
+  jiraIt("does not dump Jira primitives when no stored defs and seeds locked", () => {
     const caps = listCapabilitiesForSite({
-      site: site("https://example.atlassian.net/"),
+      site: site("https://example.atlassian.net/", [], {
+        adapterPackId: "jira",
+      }),
       primitives: [primitive("get_2_project_search"), primitive("jira_search")],
     });
     assert.deepEqual(
@@ -69,9 +80,11 @@ describe("listCapabilitiesForSite", () => {
     );
   });
 
-  it("lists Jira pipeline seed when primitives unlock it", () => {
+  jiraIt("lists Jira pipeline seed when primitives unlock it", () => {
     const caps = listCapabilitiesForSite({
-      site: site("https://example.atlassian.net/"),
+      site: site("https://example.atlassian.net/", [], {
+        adapterPackId: "jira",
+      }),
       primitives: [
         primitive("jira_get_issue"),
         primitive("jira_get_transitions"),
@@ -83,7 +96,7 @@ describe("listCapabilitiesForSite", () => {
     );
   });
 
-  it("lists stored Jira capability without dumping other primitives", () => {
+  jiraIt("lists stored Jira capability without dumping other primitives", () => {
     const stored: CapabilityDef = {
       name: "list_projects",
       description: "List Jira projects",
@@ -93,7 +106,10 @@ describe("listCapabilitiesForSite", () => {
       updatedAt: new Date().toISOString(),
     };
     const caps = listCapabilitiesForSite({
-      site: site("https://example.atlassian.net/", [stored]),
+      site: site("https://example.atlassian.net/", [stored], {
+        adapterPackId: "jira",
+        capabilityPublishMode: "curated",
+      }),
       primitives: [
         primitive("get_2_project_search"),
         primitive("jira_search"),

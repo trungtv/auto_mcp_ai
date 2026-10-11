@@ -12,14 +12,13 @@ import {
   completeLoginSession,
   cancelLoginSession,
   hasLoginSession,
-  exploreAndCapture,
-  closeBrowserSession,
   closeBrowserReplay,
+  closeBrowserSession,
 } from "@auto-mcp/browser-auth";
-import { normalizeCandidates } from "@auto-mcp/explorer";
 import {
   approveCandidatesOp,
   persistCapture,
+  quickScanOp,
   type SiteOpsContext,
 } from "@auto-mcp/mcp-control";
 import { mergeTools, upgradeTools } from "@auto-mcp/mcp-generator";
@@ -209,11 +208,18 @@ export function createApp() {
     const body = CreateSiteInputSchema.parse(await c.req.json());
     const placeholder = resolve(env.dataDir, "profiles", "_pending");
     mkdirSync(placeholder, { recursive: true });
-    const site = registry.create(body, placeholder);
-    const profileDir = registry.profileDirFor(env.dataDir, site.id, site.baseUrl);
-    mkdirSync(profileDir, { recursive: true });
-    const updated = registry.update(site.id, { profileDir });
-    return c.json({ site: updated }, 201);
+    const { site: initial, created } = registry.findOrCreate(body, placeholder);
+    let updated = initial;
+    if (created) {
+      const profileDir = registry.profileDirFor(
+        env.dataDir,
+        initial.id,
+        initial.baseUrl,
+      );
+      mkdirSync(profileDir, { recursive: true });
+      updated = registry.update(initial.id, { profileDir });
+    }
+    return c.json({ site: updated, created }, created ? 201 : 200);
   });
 
   app.delete("/api/sites/:id", async (c) => {
@@ -288,39 +294,19 @@ export function createApp() {
   });
 
   /** Passive settle capture — merges into accumulated candidates. */
-  async function runQuickScan(siteId: string) {
+  async function runQuickScan(siteId: string, reuseSession = true) {
     const site = registry.get(siteId);
     if (!site) throw new Error("Not found");
-    if (!vault.has(site.id)) {
-      throw new Error("Authenticate first (Đăng nhập)");
-    }
-    await cancelLoginSession(site.id);
-    await closeBrowserReplay(site.id);
-    await closeBrowserSession(site.id);
-    const { round } = registry.startExploreRound(
-      site.id,
-      `quick-scan ${site.explorePath}`,
+    const result = await quickScanOp(
+      { registry, vault },
+      site,
+      { reuseSession },
     );
-    const result = await exploreAndCapture({
-      baseUrl: site.baseUrl,
-      explorePath: site.explorePath,
-      profileDir: site.profileDir,
-    });
-    vault.set(site.id, result.authSnapshot);
-    const normalized = normalizeCandidates(result.candidates, site.baseUrl);
-    const { site: updated, added } = registry.mergeSiteCandidates(site.id, normalized, {
-      exploreRound: round.id,
-      focus: `quick-scan ${site.explorePath}`,
-    });
-    const pageUrl = new URL(site.explorePath, site.baseUrl).toString();
-    const withIr = persistCapture(
-      { registry },
-      site.id,
-      normalized,
-      { pageUrl, gesture: "goto" },
-      round.id,
-    );
-    return { site: withIr, candidateCount: withIr.candidates.length, added: added.length };
+    return {
+      site: result.site,
+      candidateCount: result.candidateCount,
+      added: result.added.length,
+    };
   }
 
   app.post("/api/sites/:id/explore", async (c) => {

@@ -9,7 +9,14 @@ import {
   sampleResponseBody,
 } from "./api-capture.js";
 import { recordAuthHeaders, snapshotAuthFields } from "./auth-origin.js";
-import { acquireProfileLock, releaseProfileLock } from "./profile-lock.js";
+import {
+  acquireProfileLock,
+  assertProfileAvailable,
+  releaseProfileLock,
+} from "./profile-lock.js";
+
+export { assertProfileAvailable, acquireProfileLock, releaseProfileLock } from "./profile-lock.js";
+export type { ProfileLockKind } from "./profile-lock.js";
 
 export {
   buildApiCandidate,
@@ -56,9 +63,11 @@ export interface LoginOptions {
 }
 
 export interface ExploreOptions {
+  siteId: string;
   baseUrl: string;
   explorePath: string;
   profileDir: string;
+  auth?: AuthSnapshot | null;
   settleMs?: number;
   timeoutMs?: number;
   onStatus?: (message: string) => void;
@@ -94,17 +103,38 @@ export interface ExploreResult {
   authSnapshot: AuthSnapshot;
 }
 
+async function injectAuthCookies(
+  context: BrowserContext,
+  auth?: AuthSnapshot | null,
+): Promise<void> {
+  if (!auth?.cookies?.length) return;
+  await context.addCookies(
+    auth.cookies.map((c) => ({
+      name: c.name,
+      value: c.value,
+      domain: c.domain,
+      path: c.path || "/",
+      expires: c.expires,
+      httpOnly: c.httpOnly,
+      secure: c.secure,
+      sameSite: c.sameSite,
+    })),
+  );
+}
+
 export async function exploreAndCapture(options: ExploreOptions): Promise<ExploreResult> {
   const settleMs = options.settleMs ?? 8000;
   options.onStatus?.("Opening authenticated browser for explore…");
+  assertProfileAvailable(options.profileDir);
   acquireProfileLock({
     profileDir: options.profileDir,
-    siteId: options.profileDir,
+    siteId: options.siteId,
     kind: "explore",
   });
   let context: BrowserContext | null = null;
   try {
   context = await openContext(options.profileDir);
+  await injectAuthCookies(context, options.auth);
   const page = context.pages()[0] ?? (await context.newPage());
   const authByOrigin: Record<string, Record<string, string>> = {};
   const seen = new Map<string, ApiCandidate>();

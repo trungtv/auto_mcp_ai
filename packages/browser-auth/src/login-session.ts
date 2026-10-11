@@ -6,7 +6,11 @@ import {
   snapshotAuthFields,
   type AuthHeadersByOrigin,
 } from "./auth-origin.js";
-import { acquireProfileLock, releaseProfileLock } from "./profile-lock.js";
+import {
+  acquireProfileLock,
+  assertProfileAvailable,
+  releaseProfileLock,
+} from "./profile-lock.js";
 
 function cookieToSnapshot(c: Cookie): AuthSnapshot["cookies"][number] {
   return {
@@ -47,6 +51,7 @@ export class LoginSession {
       await this.cancel();
     }
     mkdirSync(this.profileDir, { recursive: true });
+    assertProfileAvailable(this.profileDir);
     acquireProfileLock({
       profileDir: this.profileDir,
       siteId: this.siteId,

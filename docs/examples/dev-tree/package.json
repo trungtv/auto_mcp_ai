@@ -1,0 +1,12 @@
+{
+  "name": "auto-mcp-dev-tree",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "wire:entrade": "node auto_mcp_ai_packs/scripts/wire-entrade-core.mjs",
+    "build:wired": "pnpm --dir auto_mcp_ai run build:wired",
+    "build": "pnpm run build:wired",
+    "dev": "pnpm --dir auto_mcp_ai run dev",
+    "mcp:control:register": "pnpm --dir auto_mcp_ai run mcp:control:register"
+  }
+}

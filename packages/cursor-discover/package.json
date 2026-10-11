@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "pnpm run build && node --test dist/coverage.test.js dist/pack-author.test.js"
+    "test": "pnpm run build && node --test dist/coverage.test.js dist/pack-author.test.js dist/browser-tools-hints.test.js"
   },
   "dependencies": {
     "@auto-mcp/browser-auth": "workspace:*",

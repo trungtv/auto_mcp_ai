@@ -101,6 +101,7 @@ export async function runBoundPrimitive(
     argMutations?: ArgMutations;
     defaults?: CapabilityBindDefaults;
     format?: string;
+    formatOptions?: Record<string, unknown>;
     adapter: SiteAdapter;
   },
 ): Promise<CapabilityResult> {
@@ -273,6 +274,7 @@ export async function runBoundPrimitive(
       includeRaw,
       args: merged,
       site: ctx.site,
+      formatOptions: opts.formatOptions,
     });
   }
 
@@ -392,6 +394,7 @@ export async function runPipeline(
       argMutations: step.argMutations as ArgMutations | undefined,
       defaults: step.defaults as CapabilityBindDefaults | undefined,
       format,
+      formatOptions: step.formatOptions,
       adapter: opts.adapter,
     });
 
@@ -511,6 +514,7 @@ export function defToCapability(
   const mutations = def.bind.argMutations ?? {};
   const defaults = def.bind.defaults;
   const format = def.bind.format;
+  const formatOptions = def.bind.formatOptions;
   const primitiveName = def.bind.primitive;
   const supportsMutation = Boolean(
     (mutations.semester && adapter.supportsArgMutation?.semester) ||
@@ -548,6 +552,7 @@ export function defToCapability(
         argMutations: mutations,
         defaults,
         format,
+        formatOptions,
         adapter,
       });
     },

@@ -108,6 +108,8 @@ describe("defToCapability 1:N endpointIrIds", () => {
     replayMode: "http",
     observedActions: [],
     endpointIr: [],
+    adapterPackId: null,
+    capabilityPublishMode: "auto",
   };
 
   it("executes the newest lastContract.ok compiled primitive", async () => {

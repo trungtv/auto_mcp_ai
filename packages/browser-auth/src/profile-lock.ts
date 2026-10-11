@@ -20,7 +20,9 @@ function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EPERM") return true;
     return false;
   }
 }
@@ -63,6 +65,25 @@ export function acquireProfileLock(opts: {
   };
   writeFileSync(path, `${JSON.stringify(payload)}\n`);
   inProcess.set(opts.profileDir, payload);
+}
+
+/** Fail fast when another live process holds the Playwright profile. */
+export function assertProfileAvailable(profileDir: string): void {
+  const path = lockFile(profileDir);
+  if (!existsSync(path)) return;
+  try {
+    const prev = JSON.parse(readFileSync(path, "utf8")) as LockPayload;
+    if (prev.pid === process.pid) return;
+    if (pidAlive(prev.pid)) {
+      throw new Error(
+        `Profile đang bị khóa bởi ${prev.kind} (pid ${prev.pid}, site ${prev.siteId}). Đóng browser MCP/login hoặc tiến trình Playwright khác trước.`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Profile đang bị khóa")) {
+      throw err;
+    }
+  }
 }
 
 export function releaseProfileLock(profileDir: string): void {

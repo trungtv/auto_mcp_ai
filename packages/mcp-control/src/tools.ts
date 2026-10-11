@@ -3,7 +3,6 @@ import {
   closeBrowserReplay,
   closeBrowserSession,
   completeLoginSession,
-  exploreAndCapture,
   hasLoginSession,
   startLoginSession,
 } from "@auto-mcp/browser-auth";
@@ -18,11 +17,13 @@ import {
   mergeCursorMcpConfig,
 } from "@auto-mcp/mcp-runtime";
 import {
+  adapterPackIdError,
   getCapability,
   listCapabilitiesForSite,
   listKnownFormats,
   listSeedCapabilities,
   resolveAdapter,
+  resolveAdapterOrError,
 } from "@auto-mcp/site-adapters";
 import {
   CapabilityDefSchema,
@@ -56,6 +57,13 @@ import {
   validateCapabilityDef,
   type SiteOpsContext,
 } from "./site-ops.js";
+import { quickScanOp } from "./quick-scan.js";
+import {
+  bootstrapSitePackOp,
+  listInstalledAdaptersOp,
+  setCapabilityPublishModeOp,
+  setSiteAdapterPackOp,
+} from "./site-pack-ops.js";
 import { nextAfterRegister } from "./workflow.js";
 
 function ops(ctx: ControlContext): SiteOpsContext {
@@ -179,6 +187,24 @@ export const CONTROL_TOOLS: McpToolDef[] = [
     },
   },
   {
+    name: "set_explore_path",
+    title: "Set explore path",
+    description:
+      "Cập nhật explorePath (quick_scan). VD SPA: /#/misc/system-management/accm-management",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...siteIdProp,
+        explorePath: {
+          type: "string",
+          description: "Path or hash route relative to baseUrl",
+        },
+      },
+      required: ["explorePath"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "login_start",
     title: "Start login",
     description:
@@ -225,7 +251,8 @@ export const CONTROL_TOOLS: McpToolDef[] = [
   {
     name: "browser_open",
     title: "Open browser",
-    description: "Mở (hoặc reuse) browser headed với profile đã login của site.",
+    description:
+      "Mở (hoặc reuse) browser headed với profile + vault cookies. Không chạy script Playwright parallel trên cùng profile.",
     inputSchema: {
       type: "object",
       properties: { ...siteIdProp },
@@ -317,7 +344,8 @@ export const CONTROL_TOOLS: McpToolDef[] = [
   {
     name: "network_mark",
     title: "Mark network",
-    description: "Reset marker capture mạng (API sau marker được coi là mới).",
+    description:
+      "Reset marker capture mạng. Gọi trước browser_goto/click khi muốn network_snapshot chỉ ghi API sau bước đó.",
     inputSchema: {
       type: "object",
       properties: { ...siteIdProp },
@@ -328,7 +356,7 @@ export const CONTROL_TOOLS: McpToolDef[] = [
     name: "network_snapshot",
     title: "Network snapshot",
     description:
-      "Thu XHR/fetch kể từ marker, normalize/redact, merge vào candidates.",
+      "Thu XHR/fetch kể từ network_mark, merge candidates. captured=0 → trả hints (SPA/login/CAPTCHA).",
     inputSchema: {
       type: "object",
       properties: {
@@ -375,10 +403,20 @@ export const CONTROL_TOOLS: McpToolDef[] = [
     name: "quick_scan",
     title: "Quick scan",
     description:
-      "Explore thụ động: mở explorePath, settle, capture network vào candidates.",
+      "Explore thụ động explorePath → capture network. Mặc định reuseSession:true (giữ browser MCP, inject vault). reuseSession:false đóng session và mở profile mới — có thể đá login/CAPTCHA.",
     inputSchema: {
       type: "object",
-      properties: { ...siteIdProp },
+      properties: {
+        ...siteIdProp,
+        reuseSession: {
+          type: "boolean",
+          description: "Default true — reuse MCP browser session.",
+        },
+        settleMs: {
+          type: "number",
+          description: "Wait after goto (default 8000).",
+        },
+      },
       additionalProperties: false,
     },
     annotations: { openWorldHint: true },
@@ -607,14 +645,87 @@ export const CONTROL_TOOLS: McpToolDef[] = [
       properties: {
         siteId: { type: "string" },
         adapterId: { type: "string" },
+        adapterError: { type: "string" },
+        adapterPackId: { type: "string", nullable: true },
+        capabilityPublishMode: { type: "string" },
         supportsArgMutation: { type: "object" },
         seeds: { type: "array" },
         stored: { type: "array" },
         effective: { type: "array" },
       },
-      required: ["siteId", "adapterId", "seeds", "stored", "effective"],
+      required: ["siteId", "seeds", "stored", "effective"],
     },
     annotations: { readOnlyHint: true },
+  },
+  {
+    name: "list_installed_adapters",
+    title: "List wired site adapters",
+    description:
+      "Liệt kê site adapter đã build trên server (qldt-hust, jira, …) và host match cho site hiện tại.",
+    inputSchema: {
+      type: "object",
+      properties: { ...siteIdProp },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: "set_site_adapter_pack",
+    title: "Pin site adapter pack",
+    description:
+      "Ghim adapterPackId (hoặc null để clear). confirm:true sau khi user đồng ý.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...siteIdProp,
+        adapterPackId: {
+          type: "string",
+          nullable: true,
+          description: "Wired adapter id, e.g. qldt-hust; null clears pin",
+        },
+        confirm: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "set_capability_publish_mode",
+    title: "Set capability publish mode",
+    description:
+      "auto = generic-replay lists all primitives; curated = stored capabilities (+ pack seeds) only. confirm:true required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...siteIdProp,
+        mode: { type: "string", enum: ["auto", "curated"] },
+        confirm: { type: "boolean" },
+      },
+      required: ["mode"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "bootstrap_site_pack",
+    title: "Bootstrap curated site pack",
+    description:
+      "Tạo CapabilityDef từ primitives đã approve (generic.json/http). Preview without confirm; confirm:true sets capabilityPublishMode curated.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...siteIdProp,
+        primitiveNames: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional subset; default all approved (max 64)",
+        },
+        replaceExisting: {
+          type: "boolean",
+          description: "When true, replace stored defs with same names in batch",
+        },
+        confirm: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: "upsert_capability",
@@ -845,15 +956,28 @@ export async function callControlTool(
       const input = CreateSiteInputSchema.parse(args);
       const placeholder = `${ctx.dataDir}/profiles/_pending`;
       mkdirSync(placeholder, { recursive: true });
-      const site = ctx.registry.create(input, placeholder);
-      const profileDir = ctx.registry.profileDirFor(ctx.dataDir, site.id, site.baseUrl);
-      mkdirSync(profileDir, { recursive: true });
-      const updated = ctx.registry.update(site.id, { profileDir });
+      const { site: initial, created } = ctx.registry.findOrCreate(
+        input,
+        placeholder,
+      );
+      let updated = initial;
+      if (created) {
+        const profileDir = ctx.registry.profileDirFor(
+          ctx.dataDir,
+          initial.id,
+          initial.baseUrl,
+        );
+        mkdirSync(profileDir, { recursive: true });
+        updated = ctx.registry.update(initial.id, { profileDir });
+      }
       setActiveSiteId(ctx, updated.id);
       return ok({
-        site: siteSummary(updated, false),
+        site: siteSummary(updated, ctx.vault.has(updated.id)),
         activeSiteId: ctx.activeSiteId,
-        next: "Call login_start, log in in the browser, then login_confirm.",
+        created,
+        next: created
+          ? "Call login_start, log in in the browser, then login_confirm."
+          : "Site already exists for this origin — reusing registry row. Upload session or login_start if needed.",
       });
     }
 
@@ -862,6 +986,17 @@ export async function callControlTool(
       requireSite(ctx, siteId);
       setActiveSiteId(ctx, siteId);
       return ok({ activeSiteId: siteId });
+    }
+
+    if (name === "set_explore_path") {
+      const siteId = resolveSiteId(ctx, args);
+      const site = requireSite(ctx, siteId);
+      const explorePath = z.string().min(1).parse(args.explorePath);
+      const updated = ctx.registry.update(site.id, { explorePath });
+      return ok({
+        site: siteSummary(updated, ctx.vault.has(site.id)),
+        explorePath: updated.explorePath,
+      });
     }
 
     if (name === "get_site") {
@@ -961,40 +1096,21 @@ export async function callControlTool(
       const siteId = resolveSiteId(ctx, args);
       const site = requireSite(ctx, siteId);
       requireAuth(ctx, siteId);
-      await cancelLoginSession(site.id);
-      await closeBrowserReplay(site.id);
-      await closeBrowserSession(site.id);
-      const { round } = ctx.registry.startExploreRound(
-        site.id,
-        `quick-scan ${site.explorePath}`,
+      const reuseSession =
+        args.reuseSession === undefined ? true : Boolean(args.reuseSession);
+      const settleMs =
+        typeof args.settleMs === "number" ? args.settleMs : undefined;
+      const result = await quickScanOp(
+        { registry: ctx.registry, vault: ctx.vault },
+        site,
+        { reuseSession, settleMs },
       );
-      const result = await exploreAndCapture({
-        baseUrl: site.baseUrl,
-        explorePath: site.explorePath,
-        profileDir: site.profileDir,
-      });
-      ctx.vault.set(site.id, result.authSnapshot);
-      const normalized = normalizeCandidates(result.candidates, site.baseUrl);
-      const { site: updated, added } = ctx.registry.mergeSiteCandidates(
-        site.id,
-        normalized,
-        {
-          exploreRound: round.id,
-          focus: `quick-scan ${site.explorePath}`,
-        },
-      );
-      const pageUrl = new URL(site.explorePath, site.baseUrl).toString();
-      persistCapture(
-        { registry: ctx.registry },
-        site.id,
-        normalized,
-        { pageUrl, gesture: "goto" },
-        round.id,
-      );
+      const added = result.added;
       return ok({
-        site: siteSummary(updated, true),
-        candidateCount: ctx.registry.get(site.id)?.candidates.length ?? updated.candidates.length,
+        site: siteSummary(result.site, true),
+        candidateCount: result.candidateCount,
         added: added.length,
+        reuseSession: result.reuseSession,
         newApis: added.slice(0, 40).map((c) => ({
           id: c.id,
           method: c.method,
@@ -1153,18 +1269,57 @@ export async function callControlTool(
     if (name === "list_capabilities") {
       const siteId = resolveSiteId(ctx, args);
       const site = requireSite(ctx, siteId);
-      const adapter = resolveAdapter(site);
+      const resolved = resolveAdapterOrError(site);
       const primitives = upgradeTools(site.tools.filter((t) => t.approved));
       const seeds = listSeedCapabilities({ site, primitives });
       const effective = listCapabilitiesForSite({ site, primitives });
+      if (resolved.adapterError) {
+        return ok({
+          siteId,
+          adapterError: resolved.adapterError,
+          adapterPackId: site.adapterPackId,
+          capabilityPublishMode: site.capabilityPublishMode,
+          seeds: seeds.map(capSummary),
+          stored: site.capabilities ?? [],
+          effective: effective.map(capSummary),
+        });
+      }
+      if (!resolved.adapter) {
+        throw new Error("Adapter resolution failed");
+      }
+      const adapter = resolved.adapter;
       return ok({
         siteId,
         adapterId: adapter.id,
+        adapterPackId: site.adapterPackId,
+        capabilityPublishMode: site.capabilityPublishMode,
         supportsArgMutation: adapter.supportsArgMutation ?? {},
         seeds: seeds.map(capSummary),
         stored: site.capabilities ?? [],
         effective: effective.map(capSummary),
       });
+    }
+
+    if (name === "list_installed_adapters") {
+      const siteId = resolveSiteId(ctx, args);
+      return ok(listInstalledAdaptersOp(ctx.registry, siteId));
+    }
+
+    if (name === "set_site_adapter_pack") {
+      const siteId = resolveSiteId(ctx, args);
+      return ok(setSiteAdapterPackOp(ctx.registry, siteId, args));
+    }
+
+    if (name === "set_capability_publish_mode") {
+      const siteId = resolveSiteId(ctx, args);
+      return ok(setCapabilityPublishModeOp(ctx.registry, siteId, args));
+    }
+
+    if (name === "bootstrap_site_pack") {
+      const siteId = resolveSiteId(ctx, args);
+      const pinErr = adapterPackIdError(requireSite(ctx, siteId));
+      if (pinErr) throw new Error(pinErr);
+      return ok(bootstrapSitePackOp(ctx.registry, siteId, args));
     }
 
     if (name === "upsert_capability") {

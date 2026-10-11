@@ -1,0 +1,5 @@
+packages:
+  - "auto_mcp_ai/packages/*"
+  - "auto_mcp_ai/apps/*"
+  - "auto_mcp_ai_sample_packs/packages/*"
+  - "auto_mcp_ai_packs/packages/*"

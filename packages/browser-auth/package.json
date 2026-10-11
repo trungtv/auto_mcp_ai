@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "pnpm run build && node --test dist/auth-origin.test.js"
+    "test": "pnpm run build && node --test dist/auth-origin.test.js dist/profile-lock.test.js"
   },
   "dependencies": {
     "@auto-mcp/shared": "workspace:*",

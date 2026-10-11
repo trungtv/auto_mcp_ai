@@ -403,7 +403,14 @@ export const CapabilityFormatSchema = z
 export type CapabilityFormat = z.infer<typeof CapabilityFormatSchema>;
 
 /** Documented examples for MCP tool descriptions (not an exhaustive allow-list). */
+/** Core runtime formats (generic-replay pack). */
+export const GENERIC_CAPABILITY_FORMATS = [
+  "generic.http",
+  "generic.json",
+] as const;
+
 export const CAPABILITY_FORMAT_EXAMPLES = [
+  ...GENERIC_CAPABILITY_FORMATS,
   "jira.issues",
   "jira.board_issues",
   "jira.issue",
@@ -424,6 +431,11 @@ export const CapabilityArgMutationsSchema = z.object({
   projectType: z.boolean().optional(),
 });
 
+export const CapabilityFormatOptionsSchema = z.record(
+  z.string(),
+  z.unknown(),
+);
+
 export const CapabilityBindPrimitiveSchema = z.object({
   kind: z.literal("primitive"),
   primitive: z.string().min(1),
@@ -436,6 +448,8 @@ export const CapabilityBindPrimitiveSchema = z.object({
   defaults: CapabilityBindDefaultsSchema.optional(),
   /** Domain formatter id (e.g. jira.issue) — agent-facing structured output. */
   format: CapabilityFormatSchema.optional(),
+  /** Options validated by the format handler (e.g. generic.json unwrap paths). */
+  formatOptions: CapabilityFormatOptionsSchema.optional(),
 });
 export type CapabilityBindPrimitive = z.infer<
   typeof CapabilityBindPrimitiveSchema
@@ -449,6 +463,7 @@ export const CapabilityPipelineStepSchema = z.object({
   primitive: z.string().min(1),
   args: z.record(z.string()).default({}),
   format: CapabilityFormatSchema.optional(),
+  formatOptions: CapabilityFormatOptionsSchema.optional(),
   argMutations: CapabilityArgMutationsSchema.optional(),
   defaults: CapabilityBindDefaultsSchema.optional(),
 });
@@ -554,6 +569,9 @@ export const CapabilityDefSchema = z.object({
 });
 export type CapabilityDef = z.infer<typeof CapabilityDefSchema>;
 
+export const CapabilityPublishModeSchema = z.enum(["auto", "curated"]);
+export type CapabilityPublishMode = z.infer<typeof CapabilityPublishModeSchema>;
+
 export const McpSiteSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -580,6 +598,10 @@ export const McpSiteSchema = z.object({
   replayMode: ReplayModeSchema.default("http"),
   observedActions: z.array(ObservedActionSchema).default([]),
   endpointIr: z.array(EndpointIrSchema).default([]),
+  /** Pin a wired site adapter by id (overrides host match). */
+  adapterPackId: z.string().min(1).nullable().default(null),
+  /** auto = generic exposes all primitives; curated = seeds + stored capabilities only. */
+  capabilityPublishMode: CapabilityPublishModeSchema.default("auto"),
 });
 export type McpSite = z.infer<typeof McpSiteSchema>;
 
@@ -594,6 +616,16 @@ export const CreateSiteInputSchema = z.object({
   explorePath: z.string().optional(),
 });
 export type CreateSiteInput = z.infer<typeof CreateSiteInputSchema>;
+
+/** Canonical origin for deduping sites (https://host:port). */
+export function siteOriginFromUrl(url: string): string {
+  return new URL(url).origin;
+}
+
+/** Stored base_url shape in registry (`origin/`). */
+export function normalizeSiteBaseUrl(url: string): string {
+  return `${new URL(url).origin}/`;
+}
 
 export const ApproveToolsInputSchema = z.object({
   toolNames: z.array(z.string()).optional(),

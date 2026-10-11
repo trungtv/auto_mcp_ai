@@ -9,6 +9,29 @@ import { normalizeCandidates } from "@auto-mcp/explorer";
 import type { BrowserSession } from "@auto-mcp/browser-auth";
 import { analyzeCoverage } from "./coverage.js";
 
+export function networkSnapshotHints(opts: {
+  captured: number;
+  pageUrl?: string;
+  title?: string;
+}): string[] {
+  if (opts.captured > 0) return [];
+  const hints: string[] = [
+    "Gọi network_mark ngay trước browser_goto hoặc thao tác UI (click) để chỉ bắt API mới.",
+    "SPA: bấm nút load data (vd. Retrieve data) hoặc đổi tab/filter — trang tĩnh thường không bắn XHR.",
+    "Ưu tiên click menu sidebar (href thật) thay vì hash URL đoán mò.",
+  ];
+  const loginLike =
+    /login|sign in|human verification|confirm you are human/i.test(
+      `${opts.title ?? ""} ${opts.pageUrl ?? ""}`,
+    );
+  if (loginLike) {
+    hints.push(
+      "Trang có vẻ login/CAPTCHA — login_confirm sau khi đăng nhập headed.",
+    );
+  }
+  return hints;
+}
+
 export type SiteToolInventoryItem = {
   name: string;
   method?: string;
@@ -248,11 +271,23 @@ export function buildBrowserCustomTools(
         const normalized = normalizeCandidates(raw, cb.baseUrl);
         const ui = s.lastUiEvidence();
         const { added, total } = await cb.onCandidates(normalized, focus, ui);
+        let title = "";
+        try {
+          title = (await s.snapshot()).title;
+        } catch {
+          /* session may be closed */
+        }
+        const hints = networkSnapshotHints({
+          captured: normalized.length,
+          pageUrl: ui?.pageUrl,
+          title,
+        });
         return JSON.stringify({
           captured: normalized.length,
           added: added.length,
           total,
           lastUi: ui,
+          ...(hints.length ? { hints } : {}),
           newApis: added.map((c) => ({
             id: c.id,
             method: c.method,

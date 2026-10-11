@@ -16,6 +16,8 @@ import {
   defaultCursorKey,
   uniqueCursorKey,
   slugify,
+  siteOriginFromUrl,
+  normalizeSiteBaseUrl,
 } from "@auto-mcp/shared";
 import { mergeCandidates } from "@auto-mcp/explorer";
 
@@ -67,6 +69,11 @@ export class Registry {
     this.ensureColumn("replay_mode", "TEXT NOT NULL DEFAULT 'http'");
     this.ensureColumn("observed_actions_json", "TEXT NOT NULL DEFAULT '[]'");
     this.ensureColumn("endpoint_ir_json", "TEXT NOT NULL DEFAULT '[]'");
+    this.ensureColumn("adapter_pack_id", "TEXT");
+    this.ensureColumn(
+      "capability_publish_mode",
+      "TEXT NOT NULL DEFAULT 'auto'",
+    );
   }
 
   private ensureColumn(name: string, typeSql: string): void {
@@ -108,6 +115,11 @@ export class Registry {
       endpointIr: JSON.parse(
         String(row.endpoint_ir_json ?? "[]"),
       ) as EndpointIr[],
+      adapterPackId: row.adapter_pack_id
+        ? String(row.adapter_pack_id)
+        : null,
+      capabilityPublishMode:
+        row.capability_publish_mode === "curated" ? "curated" : "auto",
     };
   }
 
@@ -125,6 +137,33 @@ export class Registry {
     return row ? this.rowToSite(row) : null;
   }
 
+  /** First site with the same URL origin (tenant-local registry). */
+  findByOrigin(baseUrl: string): McpSite | null {
+    let origin: string;
+    try {
+      origin = siteOriginFromUrl(baseUrl);
+    } catch {
+      return null;
+    }
+    for (const site of this.list()) {
+      try {
+        if (siteOriginFromUrl(site.baseUrl) === origin) return site;
+      } catch {
+        /* skip corrupt row */
+      }
+    }
+    return null;
+  }
+
+  findOrCreate(
+    input: CreateSiteInput,
+    profileDir: string,
+  ): { site: McpSite; created: boolean } {
+    const existing = this.findByOrigin(input.baseUrl);
+    if (existing) return { site: existing, created: false };
+    return { site: this.create(input, profileDir), created: true };
+  }
+
   create(input: CreateSiteInput, profileDir: string): McpSite {
     const id = randomUUID();
     const createdAt = nowIso();
@@ -137,7 +176,7 @@ export class Registry {
     const site: McpSite = {
       id,
       name,
-      baseUrl: `${base.origin}/`,
+      baseUrl: normalizeSiteBaseUrl(input.baseUrl),
       explorePath,
       status: "needs_auth",
       cursorMcpKey: uniqueCursorKey(defaultCursorKey(`${base.origin}/`), taken, id),
@@ -157,6 +196,8 @@ export class Registry {
       replayMode: "http",
       observedActions: [],
       endpointIr: [],
+      adapterPackId: null,
+      capabilityPublishMode: "auto",
     };
 
     this.db
@@ -166,8 +207,8 @@ export class Registry {
           tools_json, candidates_json, proposed_tools_json, capabilities_json,
           chat_agent_id, chat_messages_json, explore_rounds_json, explore_focus,
           created_at, updated_at, last_auth_at, last_explore_at, replay_mode,
-          observed_actions_json, endpoint_ir_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          observed_actions_json, endpoint_ir_json, adapter_pack_id, capability_publish_mode
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         site.id,
@@ -192,6 +233,8 @@ export class Registry {
         site.replayMode,
         JSON.stringify(site.observedActions),
         JSON.stringify(site.endpointIr),
+        site.adapterPackId,
+        site.capabilityPublishMode,
       );
 
     return site;
@@ -221,6 +264,8 @@ export class Registry {
         | "replayMode"
         | "observedActions"
         | "endpointIr"
+        | "adapterPackId"
+        | "capabilityPublishMode"
       >
     >,
   ): McpSite {
@@ -238,7 +283,8 @@ export class Registry {
           tools_json = ?, candidates_json = ?, proposed_tools_json = ?, capabilities_json = ?,
           chat_agent_id = ?, chat_messages_json = ?, explore_rounds_json = ?, explore_focus = ?,
           updated_at = ?, last_auth_at = ?, last_explore_at = ?, notes = ?, replay_mode = ?,
-          observed_actions_json = ?, endpoint_ir_json = ?
+          observed_actions_json = ?, endpoint_ir_json = ?,
+          adapter_pack_id = ?, capability_publish_mode = ?
         WHERE id = ?`,
       )
       .run(
@@ -262,6 +308,8 @@ export class Registry {
         next.replayMode,
         JSON.stringify(next.observedActions ?? []),
         JSON.stringify(next.endpointIr ?? []),
+        next.adapterPackId,
+        next.capabilityPublishMode,
         id,
       );
     return next;
