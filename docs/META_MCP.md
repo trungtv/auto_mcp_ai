@@ -57,7 +57,15 @@ Chi tiết: [E2E_JIRA.md](E2E_JIRA.md). Thêm site pack: [EXAMPLE_JIRA_PACK.md](
 
 - **Truth:** `capabilities[]` trên registry + `adapterPackId` / `capabilityPublishMode`.
 - **auto** (mặc định): `generic-replay` expose mọi primitive approved như MCP tool.
-- **curated:** sau `bootstrap_site_pack` confirm — chỉ stored capabilities (format `generic.json` / `generic.http` qua Format Engine trong core).
+- **curated:** sau `bootstrap_site_pack` confirm — chỉ stored capabilities (format qua Format Engine trong core).
+
+| Format | Mô tả |
+|--------|--------|
+| `generic.http` | Preview HTTP thô |
+| `generic.json` | Parse JSON; `formatOptions.unwrap` (tối đa 8 segment) |
+| `generic.jmespath` | `formatOptions.expression` (JMESPath, max 256 ký tự) |
+
+Luồng V1.5: `test_endpoint_ir` confirm → `suggest_capability_format` (đọc IR) → `bootstrap_site_pack` / `upsert_capability` confirm.
 - Domain pack (QLĐT, Jira): wire trong `adapters.extra.ts`; pin bằng `set_site_adapter_pack` nếu cần.
 - Không sinh TypeScript pack per site trên runtime (non-goal).
 

@@ -64,6 +64,7 @@ import {
   setCapabilityPublishModeOp,
   setSiteAdapterPackOp,
 } from "./site-pack-ops.js";
+import { suggestCapabilityFormatOp } from "./suggest-capability-format.js";
 import { nextAfterRegister } from "./workflow.js";
 
 function ops(ctx: ControlContext): SiteOpsContext {
@@ -728,10 +729,32 @@ export const CONTROL_TOOLS: McpToolDef[] = [
     },
   },
   {
+    name: "suggest_capability_format",
+    title: "Suggest capability format",
+    description:
+      "Gợi ý bind.format + formatOptions (generic.http/json/jmespath) từ IR responseKeys / lastContract. Đọc-only; dùng trước bootstrap_site_pack hoặc upsert_capability.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...siteIdProp,
+        primitive: {
+          type: "string",
+          description: "Approved primitive name",
+        },
+        endpointIrId: {
+          type: "string",
+          description: "Alternative to primitive — uses compiledPrimitive",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true },
+  },
+  {
     name: "upsert_capability",
     title: "Upsert business capability",
     description:
-      "Tạo/cập nhật declarative capability trên site registry (DB). bind.kind=primitive (1:1 hoặc 1:N qua endpointIrIds) hoặc pipeline (≤5 steps, fail-fast). format = pack formatter id. Cùng name với seed → ghi đè; enabled:false → ẩn seed.",
+      "Tạo/cập nhật declarative capability trên site registry (DB). bind.kind=primitive (1:1 hoặc 1:N qua endpointIrIds) hoặc pipeline (≤5 steps, fail-fast). format = pack formatter id (generic.jmespath: formatOptions.expression). Cùng name với seed → ghi đè; enabled:false → ẩn seed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1320,6 +1343,23 @@ export async function callControlTool(
       const pinErr = adapterPackIdError(requireSite(ctx, siteId));
       if (pinErr) throw new Error(pinErr);
       return ok(bootstrapSitePackOp(ctx.registry, siteId, args));
+    }
+
+    if (name === "suggest_capability_format") {
+      const siteId = resolveSiteId(ctx, args);
+      const site = requireSite(ctx, siteId);
+      return ok(
+        suggestCapabilityFormatOp(site, {
+          primitive:
+            args.primitive !== undefined
+              ? String(args.primitive)
+              : undefined,
+          endpointIrId:
+            args.endpointIrId !== undefined
+              ? String(args.endpointIrId)
+              : undefined,
+        }),
+      );
     }
 
     if (name === "upsert_capability") {

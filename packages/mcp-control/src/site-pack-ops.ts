@@ -8,12 +8,12 @@ import {
 } from "@auto-mcp/site-adapters";
 import { upgradeTools } from "@auto-mcp/mcp-generator";
 import {
-  outputSchemaFromResponseKeys,
   type CapabilityDef,
   type CapabilityPublishMode,
   type McpSite,
   type ToolDef,
 } from "@auto-mcp/shared";
+import { suggestFormatForPrimitive } from "./suggest-capability-format.js";
 
 const BOOTSTRAP_MAX = 64;
 
@@ -29,38 +29,20 @@ function irForPrimitive(site: McpSite, primitiveName: string) {
   );
 }
 
-function suggestFormat(
-  tool: ToolDef,
-  site: McpSite,
-): "generic.json" | "generic.http" {
-  const ir = irForPrimitive(site, tool.name);
-  if (ir?.responseKeys?.length) return "generic.json";
-  const ct =
-    tool.headers?.["content-type"] ??
-    tool.headers?.["Content-Type"] ??
-    "";
-  if (String(ct).toLowerCase().includes("json")) return "generic.json";
-  if (tool.method === "GET" && tool.url.includes("/api/")) return "generic.json";
-  return "generic.http";
-}
-
 function buildCapabilityFromPrimitive(
   site: McpSite,
   tool: ToolDef,
-): CapabilityDef {
-  const format = suggestFormat(tool, site);
-  const ir = irForPrimitive(site, tool.name);
-  const keys = ir?.responseKeys ?? [];
-  const outputSchema = outputSchemaFromResponseKeys(keys);
+): { capability: CapabilityDef; rationale: string } {
+  const suggestion = suggestFormatForPrimitive(site, tool);
+  const rec = suggestion.recommended;
   const bind: CapabilityDef["bind"] = {
     kind: "primitive",
     primitive: tool.name,
-    format,
+    format: rec.format,
+    ...(rec.formatOptions ? { formatOptions: rec.formatOptions } : {}),
   };
-  if (format === "generic.json") {
-    validateFormatOptions(format, undefined);
-  }
-  return {
+  validateFormatOptions(rec.format, rec.formatOptions);
+  const capability: CapabilityDef = {
     name: tool.name,
     title: tool.title,
     description: tool.description || `Replay ${tool.method} ${tool.url}`,
@@ -68,11 +50,12 @@ function buildCapabilityFromPrimitive(
       type: "object",
       properties: {},
     }) as CapabilityDef["inputSchema"],
-    outputSchema,
+    outputSchema: rec.outputSchema,
     bind,
     enabled: true,
     updatedAt: new Date().toISOString(),
   };
+  return { capability, rationale: rec.rationale };
 }
 
 export function listInstalledAdaptersOp(
@@ -189,7 +172,8 @@ export function bootstrapSitePackOp(
     );
   }
 
-  const drafts = tools.map((t) => buildCapabilityFromPrimitive(site, t));
+  const built = tools.map((t) => buildCapabilityFromPrimitive(site, t));
+  const drafts = built.map((b) => b.capability);
   const replaceExisting = args.replaceExisting === true;
 
   if (args.confirm !== true) {
@@ -199,6 +183,10 @@ export function bootstrapSitePackOp(
       refused: true,
       wouldSetMode: "curated" as const,
       draftCapabilities: drafts,
+      draftWithRationale: built.map((b) => ({
+        capability: b.capability,
+        rationale: b.rationale,
+      })),
       draftCount: drafts.length,
       storedCount: stored.length,
       replaceExisting,
@@ -211,7 +199,7 @@ export function bootstrapSitePackOp(
   if (replaceExisting) {
     for (const d of drafts) byName.delete(d.name);
   }
-  for (const d of drafts) {
+  for (const d of built.map((b) => b.capability)) {
     byName.set(d.name, d);
   }
   const nextCaps = [...byName.values()];

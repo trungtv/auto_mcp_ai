@@ -1,10 +1,12 @@
 import type { FormatHandler } from "./types.js";
 import { genericHttpHandler } from "./handlers/generic-http.js";
 import { genericJsonHandler } from "./handlers/generic-json.js";
+import { genericJmespathHandler } from "./handlers/generic-jmespath.js";
 
 const HANDLERS = new Map<string, FormatHandler>([
   [genericHttpHandler.id, genericHttpHandler],
   [genericJsonHandler.id, genericJsonHandler],
+  [genericJmespathHandler.id, genericJmespathHandler],
 ]);
 
 export function registerFormatHandler(handler: FormatHandler): void {

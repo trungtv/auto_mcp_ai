@@ -24,17 +24,19 @@
     "build": "rm -rf dist tsconfig.tsbuildinfo && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -p tsconfig.json --watch",
-    "test": "pnpm run build && node --test dist/pipeline.test.js dist/registry.test.js dist/format-engine/generic-json.test.js"
+    "test": "pnpm run build && node --test dist/pipeline.test.js dist/registry.test.js dist/format-engine/generic-json.test.js dist/format-engine/generic-jmespath.test.js"
   },
   "dependencies": {
-    "@auto-mcp/shared": "workspace:*"
+    "@auto-mcp/shared": "workspace:*",
+    "jmespath": "^0.16.0"
   },
   "devDependencies": {
-    "@types/node": "^22.13.10",
-    "typescript": "^5.8.2",
     "@auto-mcp/site-adapter-jira": "workspace:*",
-    "@entrade/site-adapter-qldt": "workspace:*",
     "@entrade/site-adapter-hotellink": "workspace:*",
-    "@entrade/site-adapter-superset": "workspace:*"
+    "@entrade/site-adapter-qldt": "workspace:*",
+    "@entrade/site-adapter-superset": "workspace:*",
+    "@types/jmespath": "^0.15.2",
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
   }
 }

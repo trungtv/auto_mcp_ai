@@ -407,6 +407,7 @@ export type CapabilityFormat = z.infer<typeof CapabilityFormatSchema>;
 export const GENERIC_CAPABILITY_FORMATS = [
   "generic.http",
   "generic.json",
+  "generic.jmespath",
 ] as const;
 
 export const CAPABILITY_FORMAT_EXAMPLES = [

@@ -25,6 +25,11 @@ export {
   setCapabilityPublishModeOp,
   setSiteAdapterPackOp,
 } from "./site-pack-ops.js";
+export {
+  suggestCapabilityFormatOp,
+  suggestFormatForPrimitive,
+  type SuggestCapabilityFormatResult,
+} from "./suggest-capability-format.js";
 export { quickScanOp, type QuickScanResult } from "./quick-scan.js";
 export {
   buildApprovePreview,
